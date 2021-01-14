@@ -2,11 +2,19 @@ import db from '../public/mysql'
 
 
 export default {
-    async getUserInfo(uid: string | number) {
-        const param = [
-            ['hedianjie', '123321', 1],
-            ['hedianjie2', '123321', 0]
-        ]
-        return await db.insert('user', { });
+    async getUserInfo(where) {
+        console.log(where)
+        return await db.get('user', where);
+    },
+
+    async createUser(body) {
+        return await db.insert('user', body)
+    },
+
+    // 验证账号是否重复
+    async getLoginName(login_name) {
+        return await db.get('user', {
+            login_name
+        })
     }
 }

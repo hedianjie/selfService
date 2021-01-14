@@ -10,12 +10,12 @@ const router = Router()
 /**
  * 登录
  */
-router.post('/', )
+router.post('/', loginController.login)
 
 /**
  * 注册
  */
-router.post('/register', )
+router.post('/register', loginController.register)
 
 /**
  * 注销

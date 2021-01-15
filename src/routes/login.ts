@@ -20,6 +20,6 @@ router.post('/register', loginController.register)
 /**
  * 注销
  */
-router.post('/logout', )
+router.get('/logout', loginController.logout)
 
 export = router

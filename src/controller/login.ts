@@ -2,7 +2,6 @@ import {Request, Response, NextFunction} from 'express'
 import {format, verification} from '../public/helper'
 import db from '../public/mysql'
 import md5 from 'md5-node'
-import userServices from '../services/user'
 
 export default {
     async register(req:Request, res:Response, next:NextFunction) {
@@ -14,7 +13,7 @@ export default {
             // is_enable:  {require: false, type: 'number', scope: [0, 1], default: 0}
         }, req.body), body = bodyParse.data;
 
-        if(!bodyParse.success) return res.send(format.error(bodyParse.data, '创建用户失败！'));
+        if(!bodyParse.success) return res.send(format.error([], body));
 
         const loginNameList = await db.get('user', {login_name: body.login_name});
 
@@ -38,7 +37,7 @@ export default {
             pwd:        {require: true, type: 'string', scope: 16, change: val => md5(val)},
         }, req.body), body = bodyParse.data;
 
-        if(!bodyParse.success) return res.send(format.error(body, '登录失败！'));
+        if(!bodyParse.success) return res.send(format.error([], body));
 
         const userInfo = await db.get('user', body);
 
@@ -50,5 +49,17 @@ export default {
             return res.send(format.success(userInfo.data[0], '登录成功！'));
         }
 
+    },
+
+    
+    async logout(req:Request, res:Response, next:NextFunction) {
+        req.session.destroy(err => {
+            if(err) {
+                res.send(format.error(err, '注销失败，请重试！'));
+            }
+            else {
+                res.send(format.success([], '注销成功！'));
+            }
+        });
     }
 }

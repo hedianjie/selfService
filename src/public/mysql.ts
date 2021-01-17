@@ -10,13 +10,131 @@ type valueType = {
 
 type outsideArgType = string | valueType | valueFuncType | valueType[] | valueFuncType[]
 type insideArgType = valueType | valueFuncType | valueType[] | valueFuncType[]
+const symbolNow = Symbol('now');
+
+const dismantleSQL = (type: 'insert'|'select'|'update'|'delete'|'get', table: string, options: {[key: string]: any}, row:{[key:string]: any} = {}) => {
+    let sql, values;
+    switch(type) {
+        
+        case 'insert': {
+            const keys = Object.keys(options);
+            values = Object.values(options);
+            sql = `INSERT INTO ${table} (${keys.toString()}) VALUES (${keys.map(() => '?').toString()})`;
+            break;
+        }
+
+        case 'select': {
+            if(!options) {
+                sql = `SELECT * FROM ${table}`;
+                values = undefined;
+            }
+            else {
+                const where = options.where;
+                const columns = options.columns || ['*'];
+                const orders = options.orders;
+                const limit = options.limit;
+                const offset = options.offset;
+                sql = `SELECT ${columns.toString()} FROM ${table} WHERE delete_time IS null`
+                if(where) {
+                    for(let k in where) {
+                        if(typeof where[k] === 'string' || typeof where[k] === 'number') {
+                            sql += ` AND ${k} = ?`
+                        }
+                        else if(where[k] instanceof Array) {
+                            sql += ` AND ${k} IN (?)`
+                        }
+                    }
+                    values = Object.values(where)
+    
+                }
+                if(orders) {
+                    sql += ' ORDER BY'
+                    for(let k in orders) {
+                        sql += ` ${k} ${orders[k].toUpperCase()},`
+                    }
+                    sql = sql.substring(0, sql.length-1)
+                }
+    
+                if(!isNaN(limit)) {
+                    sql += ` LIMIT ${limit}`
+                }
+    
+                if(!isNaN(offset)) {
+                    sql += ` OFFSET ${offset}`
+                }
+            }
+            break;
+        }
+
+        case 'update': {
+            sql = `UPDATE ${table} SET `;
+            // let values;
+            for(let k in row) {
+                if(row[k] === symbolNow){
+                    sql += ` ${k}=NOW(),`;
+                    delete row[k];
+                }
+                else if(k === 'id') {
+                    options.id = row[k];
+                    delete row[k];
+                }
+                else {
+                    sql += ` ${k}=?,`
+                }
+            }
+            values = Object.values(row);
+            
+            sql = sql.substring(0, sql.length-1);
+            sql += ' WHERE delete_time IS null';
+
+            if(Object.keys(options).length) {
+                if(typeof options === 'object') {
+                    for( let k in options) {
+                        sql += ` AND ${k}=?`
+                    }
+                    values = values.concat(Object.values(options))
+                }
+            }
+            break;
+        }
+        
+        case 'delete': {
+            sql = `UPDATE ${table} SET delete_time=NOW() WHERE delete_time IS null`;
+            if(Object.keys(options).length) {
+                if(typeof options === 'object') {
+                    for( let k in options) {
+                        sql += ` AND ${k}=?`
+                    }
+                    values = values.concat(Object.values(options))
+                }
+            }
+            break;
+        }
+
+        case 'get': {
+            sql = `SELECT * FROM ${table} WHERE delete_time IS null`;
+            if(typeof options === 'object') {
+                for( let k in options) {
+                    sql += ` AND ${k} = ?`
+                }
+                values = Object.values(options);
+            }
+
+            sql += ` LIMIT 0, 1`;
+            break;
+        }
+    }
+
+    return {sql, values};
+}
 
 const poolConnection = mysql.createPool(config.connect);
 
 poolConnection.on('error', (err) => {
-    // if(err.code === '') {
-    //     printLog('mysql')
-    // }
+
+    if(err) {
+        printLog('mysql', '链接数据库失败', err)
+    }
 })
 
 
@@ -46,7 +164,12 @@ class Query {
             // 取出一个连接
             poolConnection.getConnection((err, connect) =>{
                 if(err) {
-                    printLog('mysql', '抽取一个连接失败', err)
+                    printLog('mysql', '抽取一个连接失败', err);
+
+                    return resolve({
+                        success: false,
+                        data: err
+                    });
                 }
                 else {
                     printLog('mysql', '成功抽取一个连接')
@@ -165,7 +288,12 @@ class Query {
         this.connectPromise = Object.assign(
             promise,
             {
-                next: this.next.bind(this)
+                next: this.next.bind(this),
+                insert: this.insert.bind(this),
+                select: this.select.bind(this),
+                get: this.get.bind(this),
+                updata: this.update.bind(this),
+                delete: this.delete.bind(this)
             }
         )
 
@@ -178,7 +306,7 @@ class Query {
             this.invoking.push(arg);
         }
         else if (arg instanceof Array) {
-            this.invoking = this.invoking.concat(arg)
+            this.invoking.push(arg)
         }
         else if(typeof arg === 'string') {
             this.invoking.push({
@@ -189,6 +317,32 @@ class Query {
 
         return this.connectPromise
 
+    }
+
+
+    insert(table: string, options: {[key: string]: any}) {
+        this.invoking.push(dismantleSQL('insert', table, options));
+        return this.connectPromise;
+    }
+
+    select(table: string, options?:{[key: string]: any}) {
+        this.invoking.push(dismantleSQL('select', table, options));
+        return this.connectPromise;
+    }
+
+    get(table: string, options?:{[key: string]: any}) {
+        this.invoking.push(dismantleSQL('get', table, options));
+        return this.connectPromise;
+    }
+    
+    update(table:string, options:{[key:string]: any} = {}, row:{[key:string]: any} = {}) {
+        this.invoking.push(dismantleSQL('update', table, options, row));
+        return this.connectPromise;
+    }
+
+    delete(table:string, options:{[key:string]: any}) {
+        this.invoking.push(dismantleSQL('delete', table, options));
+        return this.connectPromise;
     }
 
 
@@ -216,117 +370,42 @@ class Query {
 
 
 
+
 const DB = {
 
-    now: Symbol('now'),
+    now: symbolNow,
 
     insert(table: string, options: {[key: string]: any}) {
-        const keys = Object.keys(options);
-        const values = Object.values(options);
-        const sql = `INSERT INTO ${table} (${keys.toString()}) VALUES (${keys.map(() => '?').toString()})`;
+        const {sql, values} = dismantleSQL('insert', table, options)
         return new Query().query(sql, values);
     },
 
-    select(table: string, options?:{[key: string]: any} | undefined) {
-        if(!options) {
-            return new Query().query(`SELECT * FROM ${table}`)
-        }
-        else {
-            let values;
-            const where = options.where;
-            const columns = options.columns || ['*'];
-            const orders = options.orders;
-            const limit = options.limit;
-            const offset = options.offset;
-            let sql = `SELECT ${columns.toString()} FROM ${table} WHERE delete_time IS null`
-            if(where) {
-                for(let k in where) {
-                    if(typeof where[k] === 'string' || typeof where[k] === 'number') {
-                        sql += ` AND ${k} = ?`
-                    }
-                    else if(where[k] instanceof Array) {
-                        sql += ` AND ${k} IN (?)`
-                    }
-                }
-                values = Object.values(where)
-
-            }
-            if(orders) {
-                sql += ' ORDER BY'
-                for(let k in orders) {
-                    sql += ` ${k} ${orders[k].toUpperCase()},`
-                }
-                sql = sql.substring(0, sql.length-1)
-            }
-
-            if(!isNaN(limit)) {
-                sql += ` LIMIT ${limit}`
-            }
-
-            if(!isNaN(offset)) {
-                sql += ` OFFSET ${offset}`
-            }
-            return new Query().query(sql, values)
-        }
+    select(table: string, options?:{[key: string]: any}) {
+        const {sql, values} = dismantleSQL('select', table, options);
+        return new Query().query(sql, values);
     },
 
     get(table: string, options?:{[key: string]: any}) {
-        let sql = `SELECT * FROM ${table} WHERE delete_time IS null`;
-        let values;
-        if(typeof options === 'object') {
-            for( let k in options) {
-                sql += ` AND ${k} = ?`
-            }
-            values = Object.values(options);
-        }
-
-        sql += ` LIMIT 0, 1`;
-
-        return new Query().query(sql, values)
+        const {sql, values} = dismantleSQL('get', table, options);
+        return new Query().query(sql, values);
     },
     
-    update(table:string, row:{[key:string]: any} = {}, options:{[key:string]: any} = {}) {
-        let sql = `UPDATE ${table} SET `;
-        let values;
-        for(let k in row) {
-            if(row[k] === this.now){
-                sql += ` ${k}=NOW(),`;
-                delete row[k];
-            }
-            else if(k === 'id') {
-                options.id = row[k];
-                delete row[k];
-            }
-            else {
-                sql += ` ${k}=?,`
-            }
-        }
-        values = Object.values(row);
-        
-        sql = sql.substring(0, sql.length-1);
-        sql += ' WHERE delete_time IS null';
-
-        if(Object.keys(options).length) {
-            if(typeof options === 'object') {
-                for( let k in options) {
-                    sql += ` AND ${k}=?`
-                }
-                values = values.concat(Object.values(options))
-            }
-        }
-
-        return new Query().query(sql, values)
+    update(table:string, options:{[key:string]: any} = {}, row:{[key:string]: any} = {}) {
+        const {sql, values} = dismantleSQL('update', table, options, row);
+        return new Query().query(sql, values);
     },
 
     delete(table:string, options:{[key:string]: any}) {
-        this.update(table, {
-            delete_time: this.now
-        }, options)
+        const {sql, values} = dismantleSQL('delete', table, options);
+        return new Query().query(sql, values);
     },
 
     query(sql: outsideArgType, values?) {
         return new Query().query(sql, values)
     },
 }
+
+
+
 
 export default DB

@@ -1,7 +1,6 @@
 import {Request, Response, NextFunction} from 'express'
 import {format, deepCopy, verification} from '../public/helper'
 import md5 from 'md5-node'
-import userServices from '../services/user'
 export default {
     async getUserInfo(req:Request, res:Response, next:NextFunction) {
         if(req.session.isLogin) {

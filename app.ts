@@ -19,25 +19,27 @@ import bodyParser from 'body-parser'
 import expressSession from 'express-session'
 import config from './config';
 import requestMiddleware from './src/middleware/requestMiddleware'
+import fileMiddleware from './src/middleware/fileMiddleware'
 import errorMiddleware from './src/middleware/errorMiddleware'
 import fs from 'fs';
-
-
 const app = express();
 
 
-
-app.use(bodyParser.urlencoded());
-app.use(bodyParser.json());
-app.use(expressSession({
+const sessionMiddleware = expressSession({
     secret: config.secret,
     name: 'sid',
     rolling: true,
     cookie: {maxAge: 60000},
     saveUninitialized: true
-}))
+})
+
+app.use(bodyParser.urlencoded());
+app.use(bodyParser.json());
+app.use(sessionMiddleware);
+
 // 请求拦截 验证登录token
 app.all('/*', requestMiddleware);
+app.all('/*', fileMiddleware);
 
 
 /**
@@ -56,5 +58,5 @@ files.forEach(item => {
 app.use(errorMiddleware)
 
 app.listen(config.port, () => {
-    console.log(`Server open listen: ${config.port}`)
+    console.log(`Server open listen: ${config.port}`, `Socket open listen: ${config.port}`)
 })

@@ -1,0 +1,16 @@
+{
+	"bin": "/bin",
+	"demo": "/demo",
+	"readme": "/readme.md",
+	"title": "王老菊】半泽龙骨 | 恶魔之魂重制版08",
+	"desc": "本插件实现了uniapp下监听耳机按键消息的功能，主要监听的是安卓下广播的ACTION_MEDIA_BUTTON消息。我在最初测试的时候，发现使用uniapp的广播消息监听方法并不能很好的监听耳机按键消息，这是由于耳机消息的特殊性质决定的。就是必须要在程序里用AudioManager对象去注册消息监听，所以我封装了一个插件。",
+	"tag": [
+		"国内新闻",
+		"typescript",
+		"jquery",
+		"javascript"
+	],
+	"cover_img": "/image/cover.png",
+	"sample_img": ["/image/cover.png", "/image/cover1.png", "/image/cover2.png"],
+	"readme_img": ["/image/cover.png", "/image/cover1.png", "/image/cover2.png"]
+}

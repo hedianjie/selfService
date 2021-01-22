@@ -2,7 +2,6 @@
  * login
  */
 import {Router, Request, Response, NextFunction} from 'express'
-import {setToken} from '../public/token' 
 import loginController from '../controller/login';
 
 const router = Router()

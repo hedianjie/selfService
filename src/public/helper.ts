@@ -9,6 +9,24 @@ export const printLog = (type: string, msg: string, values?: any) : void => {
 
 export const format = {
     success(data:any=[], msg="成功") {
+        /**
+         * 过滤信息
+         * delete_time
+         * pwd
+         */
+        const filter = (data) => {
+            if(getType(data) === 'array') {
+                for(let i = 0 ; i < data.length; i++) {
+                    filter(data[i])
+                }
+            }
+            else if(getType(data) === 'object') {
+                delete data['delete_time'];
+                delete data['pwd']
+            }
+        }
+        filter(data);
+
         return {
             status: 200,
             data,
@@ -111,7 +129,7 @@ export const verification = (fieldData, values) => {
              * ：检测数组中是否存在某个值
              * ：多用来定义开关[0,1]
              */
-            else if(getType(rule.scope) !== 'array') {
+            else if(getType(rule.scope) === 'array') {
                 if(rule.scope.indexOf(val) === -1) {
                     success = false;
                     field = `验证错误：【${k}】字段可选值范围有误，只能是[${rule.scope.toString()}]中的一种！`;
@@ -124,10 +142,11 @@ export const verification = (fieldData, values) => {
              * ：检测*数字、字符串长度、数组长度*是否在某个范围之间
              * ：{max,min}
              */
-            else if(getType(val) !== 'object') {
+            else if(getType(val) === 'object') {
+
                 let num;
                 if(rule.scope.max === undefined || isNaN(rule.scope.max)) rule.scope.max = Infinity;
-                if(rule.scope.min === undefined || isNaN(rule.scope.max)) rule.scope.max = -Infinity;
+                if(rule.scope.min === undefined || isNaN(rule.scope.max)) rule.scope.min = -Infinity;
                 if(
                     getType(val) !== 'string'
                     ||
@@ -169,13 +188,15 @@ export const verification = (fieldData, values) => {
     if(success) {
         return {
             success,
-            data
+            data,
+            source: values
         }
     }
     else {
         return {
             success,
-            data: field
+            data: field,
+            source: values
         }
     }
 }

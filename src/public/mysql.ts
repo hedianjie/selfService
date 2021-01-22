@@ -172,7 +172,7 @@ class Query {
                     });
                 }
                 else {
-                    printLog('mysql', '成功抽取一个连接')
+                    // printLog('mysql', '成功抽取一个连接')
                 }
 
                 connect.beginTransaction(async err => {
@@ -180,7 +180,7 @@ class Query {
                         printLog('mysql', '开启事务失败', err)
                     }
                     else {
-                        printLog('mysql', '成功开启事务')
+                        // printLog('mysql', '成功开启事务')
                     }
 
                     let queryArr: insideArgType[] = [];
@@ -263,7 +263,7 @@ class Query {
                                 printLog('mysql', '提交事务出错', err)
                             }
                             else {
-                                printLog('mysql', '提交事务成功')
+                                // printLog('mysql', '提交事务成功')
                             }
                         })
                     }
@@ -273,7 +273,7 @@ class Query {
                                 printLog('mysql', '事务回滚出错', err)
                             }
                             else {
-                                printLog('mysql', '成功回滚')
+                                // printLog('mysql', '成功回滚')
                             }
                         })
                     }

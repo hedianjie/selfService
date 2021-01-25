@@ -3,8 +3,8 @@ import fs from 'fs'
 import path from 'path'
 const whiteUrl = [
     '/login',
-    '/package/mergeUploadPackage',
-    '/package/beginUploadPackage'
+    // '/package/mergeUploadPackage',
+    // '/package/beginUploadPackage'
 ]
 
 export default (req: Request, res: Response, next: NextFunction) => {

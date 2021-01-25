@@ -30,20 +30,63 @@ export default {
         }
 
         let dirList;
-        const dir = path.resolve(__dirname, `../../uploads/${body.filename}-${body.hash}`);
-        const resultPath = path.join(dir, `${body.filename}-${body.hash}.${body.mime}`);
+        const userInfo = req.session.userInfo;
+        const userId = userInfo.id;
+        const userDir = path.resolve(__dirname, `../../uploads/${userId}`);
+        const packageDir = path.join(userDir, `${body.filename}-${body.hash}`);
+        const resultPath = path.join(packageDir, `${body.filename}-${body.hash}.${body.mime}`);
 
-        // 查看组合文件是否存在 如果存在了 就不需要重复上传了
+        // 查看组合文件是否存在 如果存在了 就不需要重复上传了 直接返回结果
         if(fs.existsSync(resultPath)) {
-            return res.send(format.error(resultPath, '文件已生成，无需重复上传！'));
+            // 查看数据库是否已经创建这个包
+            const result = await db.get('package', {
+                hash: body.hash,
+                user_id: userId
+            });
+            // console.log(resultPath)
+            if(result.data.length) {
+                res.send(format.error([], '文件已创建，重复上传！'));
+            }
+            else {
+                const def = {
+                    directory_name: `${body.filename}.${body.mime}`,
+                    hash: body.hash
+                }
+                // 返回explain.json中的内容
+                if(fs.existsSync(path.join(packageDir, 'explain.json'))) {
+                    const explain = require(path.join(packageDir, 'explain.json'));
+    
+                    // 查看readme是否存在
+                    if(explain.readme && fs.existsSync(path.join(packageDir, explain.readme))) {
+    
+    
+                        res.send(format.success({
+                            ...explain,
+                            ...def,
+                            readme: fs.readFileSync(path.join(packageDir, explain.readme), 'utf-8')
+                        }, undefined, 201));
+                    }
+                    else {
+                        res.send(format.success({
+                            ...explain,
+                            ...def,
+                        }, undefined, 201));
+                    }
+                    
+                }
+                else {
+                    res.send(format.success(def, undefined, 201));
+                }
+            }
+            return;
         }
 
         // 查看文件目录是否存在 
-        if(!fs.existsSync(dir)) {
+        if(!fs.existsSync(packageDir)) {
             res.send(format.success([]));
         }
         else {
-            dirList = fs.readdirSync(dir);
+            dirList = fs.readdirSync(packageDir);
             dirList = dirList.map(item => item.split('-')[1]);
             res.send(format.success(dirList));
         }
@@ -66,20 +109,27 @@ export default {
         }, req.body), body = bodyParse.data;
 
         if(!bodyParse.success) {
-            return next(body)
+            return res.send(format.error(body));
         }
 
         let dirList;
-        const dir = path.resolve(__dirname, `../../uploads/${body.filename}-${body.hash}`);
-        const resultPath = path.join(dir, `${body.filename}-${body.hash}.${body.mime}`);
+        const userInfo = req.session.userInfo;
+        const userId = userInfo.id;
+        const userDir = path.resolve(__dirname, `../../uploads/${userId}`);
+        const packageDir = path.join(userDir, `${body.filename}-${body.hash}`);
+        const resultPath = path.join(packageDir, `${body.filename}-${body.hash}.${body.mime}`);
 
+        // 查看是否有用户目录
+        if(!fs.existsSync(userDir)) {
+            return res.send(format.error(body.filename, '未找到用户文件夹，请重新上传'));
+        }
 
         // 查看是否有存放目录
-        if(fs.existsSync(dir)) {
-            dirList = fs.readdirSync(dir);
+        if(fs.existsSync(packageDir)) {
+            dirList = fs.readdirSync(packageDir);
         }
         else {
-            return res.send(format.error(body.filename, '未找到文件夹，请重新上传'));
+            return res.send(format.error(body.filename, '未找到包存放文件夹，请重新上传'));
         }
 
         // 验证文件数量是否符合
@@ -92,7 +142,7 @@ export default {
             let aIndex = a.split('-')[1];
             let bIndex = b.split('-')[1];
             return aIndex-bIndex;
-        }).map(item => path.join(dir, item))
+        }).map(item => path.join(packageDir, item))
   
         concat(dirList, resultPath, (err) => {
             if(err) {
@@ -102,23 +152,23 @@ export default {
                 // 删除原文件碎片
                 dirList.forEach(url => fs.unlinkSync(url));
                 // 解压压缩包
-                compressing[body.mime].uncompress(resultPath, dir)
+                compressing[body.mime].uncompress(resultPath, packageDir)
                 .then(() => {
 
                     // 查看解压后的文件 如果是文件夹 则把文件移出来
-                    let nextDirList = fs.readdirSync(dir);
+                    let nextDirList = fs.readdirSync(packageDir);
                     // 排除{原}压缩文件
                     nextDirList.splice(nextDirList.indexOf(`${body.filename}-${body.hash}.${body.mime}`), 1);
                     if(nextDirList.length === 1) {
                         // 解压后文件的地址
-                        const furl = path.join(dir, nextDirList[0]);
+                        const furl = path.join(packageDir, nextDirList[0]);
                         const stat = fs.statSync(furl);
                         if(stat.isDirectory()) {
                             const flist = fs.readdirSync(furl);
                             // 循环移除零件
                             flist.forEach(item => fs.renameSync(
                                 path.join(furl, item),
-                                path.join(dir, item)
+                                path.join(packageDir, item)
                             ));
 
                             try {
@@ -128,13 +178,34 @@ export default {
                         }
                     }
 
-
+                    const def = {
+                        directory_name: `${body.filename}.${body.mime}`,
+                        hash: body.hash
+                    }
                     // 返回explain.json中的内容
-                    if(fs.existsSync(path.join(dir, 'explain.json'))) {
-                        res.send(format.success(require(path.join(dir, 'explain.json'))));
+                    if(fs.existsSync(path.join(packageDir, 'explain.json'))) {
+                        const explain = require(path.join(packageDir, 'explain.json'));
+
+                        // 查看readme是否存在
+                        if(explain.readme && fs.existsSync(path.join(packageDir, explain.readme))) {
+
+
+                            res.send(format.success({
+                                ...explain,
+                                ...def,
+                                readme: fs.readFileSync(path.join(packageDir, explain.readme), 'utf-8')
+                            }));
+                        }
+                        else {
+                            res.send(format.success({
+                                ...explain,
+                                ...def,
+                            }));
+                        }
+                        
                     }
                     else {
-                        res.send(format.success({}));
+                        res.send(format.success(def));
                     }
                     
                 })
@@ -171,18 +242,31 @@ export default {
             }
             return res.send(format.error(body.index, body));
         }
+        
+        const userInfo = req.session.userInfo;
+        const userId = userInfo.id;
+        const userDir = path.resolve(__dirname, `../../uploads/${userId}`);
+        const packageDir = path.join(userDir, `${body.filename}-${body.hash}`);
+        const resultPath = path.join(packageDir, `${body.filename}-${body.hash}.${body.mime}`);
+        const fileUrl = path.join(packageDir, `${body.hash}-${body.index}`);
 
-        const dir = path.resolve(__dirname, `../../uploads/${body.filename}-${body.hash}`);
-        const fileUrl = path.join(dir, `/${body.hash}-${body.index}`);
-        const resultPath = path.join(dir, `${body.filename}-${body.hash}.${body.mime}`);
-
-        // 查看是否有存放目录
-        if(!fs.existsSync(dir)) {
+        // 查看是否有用户目录
+        if(!fs.existsSync(userDir)) {
             try {
-                fs.mkdirSync(dir);
+                fs.mkdirSync(userDir);
             }
             catch(e) {
-                return res.send(format.error(body.index, `创建文件夹失败，文件夹名称 ${body.filename} !`))
+                return res.send(format.error(body.index, `创建用户文件夹失败，文件夹名称 ${body.filename} !`))
+            }
+        }
+        
+        // 查看是否有存放目录
+        if(!fs.existsSync(packageDir)) {
+            try {
+                fs.mkdirSync(packageDir);
+            }
+            catch(e) {
+                return res.send(format.error(body.index, `创建包文件夹失败，文件夹名称 ${body.filename} !`))
             }
         }
        
@@ -216,5 +300,60 @@ export default {
                 res.send(format.error(body.index, `移动包出错，包索引 ${body.index} !`))
             }
         }
+    },
+
+
+    /**
+     * 添加/版本 上传包信息
+     */
+
+    async createPackage(req:Request, res:Response, next:NextFunction) {
+        const bodyParse = verification({
+            // 有id编辑 无id创建
+            id: {require: false},
+            title: {require: true, type: 'string', scope: 50},
+            version: {require: true, type: 'string'},
+            version_description: {require: true, type: 'string', scope: 200},
+            description: {require: true, type: 'string', scope: 200 },
+            // string创建类型 number=>id
+            type_id: {require: true, scope: 16},
+            cover_img: {require: false, default: []},
+            sample_img: {require: false, default: []},
+            readme_img: {require: false, default: []},
+            // 有parent_id 创建版本
+            parent_id: {require: false},
+            directory_name: {require: true, type: 'string', scope: 16},
+            package_size: {require: true, type: 'string'},
+
+            package_download_url: {require: true, type: 'string'},
+            package_sample_url: {require: true, type: 'string'},
+
+            hash: {require: true, type: 'string'},
+
+
+        }, req.body), body = bodyParse.data;
+
+        if(!bodyParse.success) {
+            return res.send(format.error(body));
+        }
+        
+        body.user_id = req.session.userInfo.id;
+        body.cover_img = JSON.stringify(body.cover_img);
+        body.sample_img = JSON.stringify(body.sample_img);
+        body.readme_img = JSON.stringify(body.readme_img);
+
+        
+
+        const result = await db.insert('package', body)
+        console.log(result);
+        if(result.success) {
+            res.send(format.success([]))
+        }
+        else {
+            res.send(format.error(result.data))
+        }
+        
+
+        
     }
 }

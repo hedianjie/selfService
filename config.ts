@@ -1,3 +1,5 @@
+
+import path from 'path'
 export default {
     // 生成token秘钥
     secret: 'JUU0JUJEJTk1JUU2JUFFJUJGJUU2JTlEJUIw', // btoa(encodeURI('何殿杰'))
@@ -13,5 +15,10 @@ export default {
         user: 'root',
         password: 'root',
         database: 'project'
+    },
+
+    static:
+    {
+        // '/upload': path.join(__dirname, './uploads')
     }
 }

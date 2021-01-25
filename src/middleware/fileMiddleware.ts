@@ -20,15 +20,15 @@ export default (req: Request, res: Response, next: NextFunction) => {
             next(err);
         }
         // 未登录禁止操作
-        // else if (!req.session.isLogin) {
-        //     for(let k in file) {
-        //         fs.unlinkSync((file[k] as any).path)
-        //     }
-        //     const err = new Error();
-        //     err.name = 'UN_LOGIN';
-        //     err.message = '用户未登录，请登录后操作！';
-        //     next(err)
-        // }
+        else if (!req.session.isLogin) {
+            for(let k in file) {
+                fs.unlinkSync((file[k] as any).path)
+            }
+            const err = new Error();
+            err.name = 'UN_LOGIN';
+            err.message = '用户未登录，请登录后操作！';
+            next(err)
+        }
         else {
             req.body = {
                 ...fields,

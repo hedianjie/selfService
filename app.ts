@@ -29,7 +29,7 @@ const sessionMiddleware = expressSession({
     secret: config.secret,
     name: 'sid',
     rolling: true,
-    cookie: {maxAge: 60000},
+    cookie: {maxAge: 600000},
     saveUninitialized: true
 })
 
@@ -55,7 +55,17 @@ files.forEach(item => {
 });
 
 // 错误信息拦截
-app.use(errorMiddleware)
+app.use(errorMiddleware);
+
+// 静态文件
+if(config.static) {
+
+    for(let k in config.static) {
+        app.use(k, express.static(config.static[k]))
+    }
+    
+}
+
 
 app.listen(config.port, () => {
     console.log(`Server open listen: ${config.port}`, `Socket open listen: ${config.port}`)

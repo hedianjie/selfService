@@ -8,7 +8,7 @@ export const printLog = (type: string, msg: string, values?: any) : void => {
 }
 
 export const format = {
-    success(data:any=[], msg="成功") {
+    success(data:any=[], msg="成功", code=200) {
         /**
          * 过滤信息
          * delete_time
@@ -28,15 +28,15 @@ export const format = {
         filter(data);
 
         return {
-            status: 200,
+            status: code,
             data,
             msg
         }
     },
 
-    error(data:any=[], msg="失败") {
+    error(data:any=[], msg="失败", code=500) {
         return {
-            status: 500,
+            status: code,
             data,
             msg
         }
